@@ -8,6 +8,7 @@
         "__static": true
     },
     "rules": {
+        "import/no-unresolved": 0,
         "linebreak-style": "off",
         "semi": 0
     },

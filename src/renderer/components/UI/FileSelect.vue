@@ -5,7 +5,7 @@
         {{ $t("app.fileselect.wowfolder" /* World of Warcraft folder */) }}
       </p>
       <div class="fakeinput pointer">
-        <span class="wow-path">{{ path }}&nbsp;</span>
+        <span class="wow-path">{{ wowPath.value }}&nbsp;</span>
       </div>
       <div class="pointer-icon" />
     </span>
@@ -14,15 +14,14 @@
 
 <script>
 import { remote } from "electron";
+import { mapState } from "vuex";
 
 export default {
+  computed: mapState("config", ["wowPath"]),
   data() {
     return {
       dialogOpen: false
     };
-  },
-  props: {
-    path: null
   },
   methods: {
     handleInputClick() {
@@ -35,7 +34,7 @@ export default {
             this.dialogOpen = false;
 
             if (paths && paths.length) {
-              this.$emit("update:path", paths[0]);
+              this.$store.commit("config/SET_WOW_PATH", { value: paths[0] });
             }
           }
         );

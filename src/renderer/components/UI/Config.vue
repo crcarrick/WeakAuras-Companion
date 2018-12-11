@@ -4,24 +4,24 @@
       {{ $t("app.config.gameSettings" /* Game Settings */) }}
     </div>
     <div class="block">
-      <file-select :path.sync="config.wowpath.value"></file-select>
+      <file-select></file-select>
       <img
-        v-if="config.wowpath.valided"
+        v-if="wowPath.valided"
         class="green"
         :src="require(`@/assets/ok.png`)"
       />
       <img v-else class="red" :src="require(`@/assets/error.png`)" />
-      <span v-if="config.wowpath.valided">
+      <span v-if="wowPath.valided">
         <p class="label">
           {{ $t("app.config.selectAccount" /* Select Account */) }}
         </p>
-        <select v-model="config.account.value" class="form-control">
-          <option v-for="item in config.account.choices" :key="item.name">{{
+        <select v-model="accountValue" class="form-control">
+          <option v-for="item in account.choices" :key="item.name">{{
             item.name
           }}</option>
         </select>
         <img
-          v-if="config.account.valided"
+          v-if="account.valided"
           class="green"
           :src="require(`@/assets/ok.png`)"
         />
@@ -36,16 +36,14 @@
         {{ $t("app.config.wagoAccount" /* Wago Account (optional) */) }}
       </p>
       <input type="text" v-model="wagoUsername" size="11" />
-      <v-button @click="config.wagoUsername = wagoUsername">{{
-        $t("app.config.ok" /* Ok */)
-      }}</v-button>
+      <v-button>{{ $t("app.config.ok" /* Ok */) }}</v-button>
       <img
-        v-if="config.wagoUsername"
+        v-if="wagoUsername"
         class="green"
         :src="require(`@/assets/ok.png`)"
       />
       <br /><br />
-      <checkbox v-model="config.ignoreOwnAuras">
+      <checkbox v-model="ignoreOwnAuras">
         {{
           $t("app.config.ignoreOwnAuras" /* Ignore auras from your account */)
         }}
@@ -56,7 +54,7 @@
     </div>
     <div class="block">
       <p class="label">{{ $t("app.config.lang" /* Language */) }}</p>
-      <select v-model="config.lang" class="form-control language">
+      <select v-model="lang" class="form-control language">
         <option
           v-for="lang in langs"
           :value="lang.value"
@@ -64,7 +62,7 @@
           :key="lang.value"
         ></option> </select
       ><br /><br />
-      <checkbox v-model="config.notify">
+      <checkbox v-model="notify">
         {{
           $t(
             "app.config.notification" /* Receive a notification when auras get updated */
@@ -74,14 +72,14 @@
       <br /><br />
       <p class="label subtitle">{{ $t("app.config.startup" /* Startup */) }}</p>
       <div class="option">
-        <checkbox v-model="config.autostart">
+        <checkbox v-model="autoStart">
           {{
             $t("app.config.autoStart" /* Launch client with your computer */)
           }}
         </checkbox>
       </div>
       <div class="option">
-        <checkbox v-model="config.startminimize">
+        <checkbox v-model="startMinimized">
           {{ $t("app.config.minimized" /* Start client minimized */) }}
         </checkbox>
       </div>
@@ -98,6 +96,8 @@
 import fs from "fs";
 import path from "path";
 import AutoLaunch from "auto-launch";
+import { mapState } from "vuex";
+
 import Button from "./Button.vue";
 import Checkbox from "./Checkbox.vue";
 import FileSelect from "./FileSelect.vue";
@@ -106,7 +106,74 @@ const AutoLauncher = new AutoLaunch({
   name: "WeakAuras Companion"
 });
 export default {
-  props: ["config"],
+  computed: {
+    ...mapState(["config"]),
+    account: state => state.config.account,
+    accountValue: {
+      get() {
+        return this.config.account.value;
+      },
+      set(account) {
+        this.$store.commit("config/SET_ACCOUNT", { value: account });
+      }
+    },
+    autoStart: {
+      get() {
+        return this.config.autoStart;
+      },
+      set(autoStart) {
+        this.$store.commit("config/SET_AUTO_START", autoStart);
+      }
+    },
+    ignoreOwnAuras: {
+      get() {
+        return this.config.ignoreOwnAuras;
+      },
+      set(ignoreOwnAuras) {
+        this.$store.commit("config/SET_IGNORE_OWN_AURAS", ignoreOwnAuras);
+      }
+    },
+    lang: {
+      get() {
+        return this.config.lang;
+      },
+      set(lang) {
+        this.$store.commit("config/SET_LANG", lang);
+      }
+    },
+    notify: {
+      get() {
+        return this.config.notify;
+      },
+      set(notify) {
+        this.$store.commit("config/SET_NOTIFY", notify);
+      }
+    },
+    startMinimized: {
+      get() {
+        return this.config.startMinimized;
+      },
+      set(startMinimized) {
+        this.$store.commit("config/SET_START_MINIMIZED", startMinimized);
+      }
+    },
+    wagoUsername: {
+      get() {
+        return this.config.wagoUsername;
+      },
+      set(wagoUsername) {
+        this.$store.commit("config/SET_WAGO_USERNAME", wagoUsername);
+      }
+    },
+    wowPath: {
+      get() {
+        return this.config.wowPath;
+      },
+      set(wowPath) {
+        this.$store.commit("config/SET_WOW_PATH", { wowPath });
+      }
+    }
+  },
   data() {
     return {
       langs: [
@@ -114,8 +181,7 @@ export default {
         { value: "en", text: "English (en)" },
         { value: "fr", text: "Français (fr)" },
         { value: "ru", text: "Русский (ru)" }
-      ],
-      wagoUsername: this.config.wagoUsername
+      ]
     };
   },
   components: {
@@ -126,12 +192,11 @@ export default {
   methods: {
     reset() {
       this.$parent.reset();
-      this.wagoUsername = null;
     }
   },
   watch: {
     // eslint-disable-next-line func-names
-    "config.autostart": function() {
+    "config.autoStart": function() {
       if (this.config.autostart) {
         AutoLauncher.enable();
       } else {
@@ -139,38 +204,35 @@ export default {
       }
     },
     // eslint-disable-next-line func-names
-    "config.wowpath.value": function() {
-      if (this.config.wowpath.value) {
-        // clean Accounts options
-        while (this.config.account.choices.length > 0) {
-          this.config.account.choices.pop();
-        }
+    "config.wowPath.value": function() {
+      if (this.config.wowPath.value) {
         // test if ${wowpath}\WTF\Account exists
         const accountFolder = path.join(
-          this.config.wowpath.value,
+          this.config.wowPath.value,
           "WTF",
           "Account"
         );
         fs.access(accountFolder, fs.constants.F_OK, err => {
           if (!err) {
             // add option for each account found
-            fs.readdirSync(accountFolder).forEach(file => {
-              if (file !== "SavedVariables") {
-                this.config.account.choices.push({ name: file });
-                this.config.wowpath.valided = true;
-              }
-            });
+            const choices = fs
+              .readdirSync(accountFolder)
+              .filter(file => file !== "SavedVariables")
+              .map(file => ({ name: file }));
+
+            this.$store.commit("config/SET_ACCOUNT", { choices });
+            this.$store.commit("config/SET_WOW_PATH", { valided: true });
           } else {
-            this.config.wowpath.valided = false;
+            this.$store.commit("config/SET_WOW_PATH", { valided: false });
           }
         });
       }
     },
     // eslint-disable-next-line func-names
     "config.account.value": function() {
-      if (this.config.wowpath.valided && !!this.config.account.value) {
+      if (this.config.wowPath.valided && !!this.config.account.value) {
         const WeakAurasSavedVariable = path.join(
-          this.config.wowpath.value,
+          this.config.wowPath.value,
           "WTF",
           "Account",
           this.config.account.value,
@@ -179,9 +241,9 @@ export default {
         );
         fs.access(WeakAurasSavedVariable, fs.constants.F_OK, err => {
           if (!err) {
-            this.config.account.valided = true;
+            this.$store.commit("config/SET_ACCOUNT", { valided: true });
           } else {
-            this.config.account.valided = false;
+            this.$store.commit("config/SET_ACCOUNT", { valided: false });
           }
         });
       }

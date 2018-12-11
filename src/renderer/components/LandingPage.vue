@@ -1,51 +1,13 @@
 <template>
   <div id="wrapper">
-    <TitleBar></TitleBar>
+    <wa-title />
     <img :src="require(`@/assets/weakauras.png`)" class="wa-logo-background" />
     <div class="logos">
       <img :src="require(`@/assets/weakauras.png`)" class="wa-logo-top" />
       <span>{{ $t("app.main.companion" /* Companion */) }}</span>
     </div>
-    <header>
-      <v-button type="menu" @click="configStep = 0">{{
-        $t("app.menu.main" /* Main */)
-      }}</v-button>
-      <span class="seperator">|</span>
-      <v-button type="menu" @click="configStep = 1">{{
-        $t("app.menu.settings" /* Settings */)
-      }}</v-button>
-      <span class="seperator">|</span>
-      <v-button type="menu" @click="configStep = 2">{{
-        $t("app.menu.about" /* About */)
-      }}</v-button>
-    </header>
-    <main>
-      <div v-if="configStep === 0" id="dashboard">
-        <refreshButton
-          :usable="config.wowpath.valided && config.account.valided"
-          :fetching="fetching"
-          :lastUpdate="schedule.lastUpdate"
-        ></refreshButton>
-        <br />
-        <div class="updates" v-if="aurasFilteredAndSorted.length > 0">
-          <span v-if="showNewUpdate" class="showNewUpdate">{{
-            $t(
-              "app.main.newUpdates" /* We found the following updates for you, they can now be applied in-game: */
-            )
-          }}</span>
-          <span v-else>{{ $t("app.main.updates" /* Updates */) }}</span>
-        </div>
-        <div id="aura-list">
-          <Aura
-            v-for="aura in aurasFilteredAndSorted"
-            :aura="aura"
-            :key="aura.slug"
-          ></Aura>
-        </div>
-      </div>
-      <Config v-if="configStep === 1" :config="config"></Config>
-      <about v-if="configStep === 2"></about>
-    </main>
+    <wa-nav />
+    <main><router-view></router-view></main>
     <footer>
       <a
         v-for="media in footerMedias"
@@ -60,35 +22,36 @@
         />
       </a>
       <div id="messages" ref="messages">
-        <message
+        <wa-msg
           v-for="message in messages"
           :key="message.id"
           :message="message"
-        ></message>
+        />
       </div>
     </footer>
   </div>
 </template>
 
 <script lang="ts">
-import Vue from "vue";
+import fs from "fs";
 import path from "path";
+
+import luaparse from "luaparse";
 import moment from "moment";
-import Button from "./UI/Button.vue";
-import RefreshButton from "./UI/RefreshButton.vue";
+import Store from "electron-store";
+import Vue from "vue";
+import { mapState } from "vuex";
+
 import Message from "./UI/Message.vue";
-import Aura from "./UI/Aura.vue";
-import Config from "./UI/Config.vue";
-import About from "./UI/About.vue";
+import Nav from "./UI/Nav.vue";
 import TitleBar from "./UI/TitleBar.vue";
 
-const fs = require("fs");
-const luaparse = require("luaparse");
-const Store = require("electron-store");
 const hash = require("./libs/hash.js");
 const medias = require("./libs/contacts.js");
 
-const store = new Store();
+// eslint-disable-next-line no-console
+
+const electronStore = new Store();
 luaparse.defaultOptions.comments = false;
 luaparse.defaultOptions.scope = true;
 
@@ -97,23 +60,6 @@ const defaultValues = {
   auras: [], // array of auras, slug field must be unique
   messages: [],
   fetching: false, // use for avoid spamming refresh button and show spinner
-  config: {
-    wowpath: {
-      value: null,
-      valided: false
-    },
-    account: {
-      value: null, // name of the account selected
-      valided: false,
-      choices: []
-    },
-    wagoUsername: null, // ignore your own auras
-    ignoreOwnAuras: true,
-    autostart: false,
-    startminimize: false,
-    notify: true,
-    lang: "en"
-  },
   schedule: {
     id: null, // 1h setTimeout id
     lastUpdate: null
@@ -125,16 +71,12 @@ const defaultValues = {
 export default Vue.extend({
   name: "landing-page",
   components: {
-    RefreshButton,
-    Message,
-    Aura,
-    Config,
-    About,
-    TitleBar,
-    "v-button": Button
+    "wa-msg": Message,
+    "wa-nav": Nav,
+    "wa-title": TitleBar
   },
   data() {
-    return JSON.parse(JSON.stringify(defaultValues));
+    return { ...defaultValues };
   },
   watch: {
     configStep() {
@@ -159,7 +101,7 @@ export default Vue.extend({
       this.compareSVwithWago();
     });
     this.restore();
-    if (!this.config.wowpath.valided || !this.config.account.valided) {
+    if (!this.config.wowPath.valided || !this.config.account.valided) {
       this.configStep = 1;
     } else {
       this.configStep = 0;
@@ -167,6 +109,8 @@ export default Vue.extend({
     }
   },
   computed: {
+    ...mapState(["config"]),
+
     accountHash() {
       return hash.hashFnv32a(this.config.account.value, true);
     },
@@ -199,25 +143,25 @@ export default Vue.extend({
   },
   methods: {
     reset() {
-      this.config = JSON.parse(JSON.stringify(defaultValues.config));
+      this.$store.commit("config/RESET");
       while (this.messages.length > 0) {
         this.messages.pop();
       }
       while (this.auras.length > 0) {
         this.auras.pop();
       }
-      store.clear();
+      electronStore.clear();
     },
     open(link) {
       this.$electron.shell.openExternal(link);
     },
     save(fields) {
       fields.forEach(field => {
-        store.set(field, this[field]);
+        electronStore.set(field, this[field]);
       });
     },
     restore() {
-      Object.entries(store.store).forEach(data => {
+      Object.entries(electronStore.store).forEach(data => {
         const { 0: key, 1: value } = data;
         this[key] = value;
       });
@@ -244,14 +188,14 @@ export default Vue.extend({
     },
     compareSVwithWago() {
       this.clearMessages();
-      if (!this.config.wowpath.valided || !this.config.account.valided) {
+      if (!this.config.wowPath.valided || !this.config.account.valided) {
         return;
       }
       if (this.fetching) return; // prevent spamming button
       this.fetching = true; // show animation
       if (this.schedule.id) clearTimeout(this.schedule.id); // cancel next 1h schedule
       const WeakAurasSavedVariable = path.join(
-        this.config.wowpath.value,
+        this.config.wowPath.value,
         "WTF",
         "Account",
         this.config.account.value,
@@ -508,9 +452,9 @@ export default Vue.extend({
       });
     },
     writeAddonData(newStrings, failStrings) {
-      if (this.config.wowpath.valided) {
+      if (this.config.wowPath.valided) {
         const AddonFolder = path.join(
-          this.config.wowpath.value,
+          this.config.wowPath.value,
           "Interface",
           "Addons",
           "WeakAurasCompanion"
@@ -676,11 +620,6 @@ body {
   display: flex;
   background-size: cover;
   flex-direction: column;
-}
-header {
-  text-align: right;
-  height: 50px;
-  margin: 15px 15px 0 0;
 }
 main {
   flex: 1;

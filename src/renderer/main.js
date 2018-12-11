@@ -5,6 +5,7 @@ import VueElectron from "vue-electron";
 
 import App from "./App.vue";
 import router from "./router";
+import store from "./store";
 
 const en = require("../../i18n/en.json");
 const fr = require("../../i18n/fr.json");
@@ -37,6 +38,7 @@ const i18n = new VueI18n({
 new Vue({
   components: { App },
   router,
+  store,
   i18n,
   template: "<App/>"
 }).$mount("#app");

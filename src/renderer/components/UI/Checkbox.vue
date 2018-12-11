@@ -20,6 +20,7 @@ export default {
       this.$refs.checkbox.click();
     }
   },
+  name: "checkbox",
   props: ["value"]
 };
 </script>
